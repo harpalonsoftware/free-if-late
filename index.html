@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Free if Late!</title>
+<script src="https://bridge.playgama.com/v2/stable/playgama-bridge.js"></script>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#E8EAED; overflow:hidden;
+    font-family:-apple-system, "Segoe UI", Roboto, Arial, sans-serif; touch-action:none;
+    -webkit-user-select:none; user-select:none; }
+  #wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+  canvas { flex:1; display:block; width:100%; }
+  #toolbar { min-height:78px; background:#ffffff; display:flex; gap:8px; align-items:center;
+    justify-content:flex-start; padding:8px 10px; box-sizing:border-box; overflow-x:auto;
+    box-shadow:0 -2px 8px #0002; }
+  .tool { flex:0 0 auto; width:96px; height:62px; border:2px solid #DADCE0; border-radius:14px; background:#fff;
+    color:#202124; font-size:12px; font-weight:700; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1px; cursor:pointer; }
+  .tool .ic { font-size:20px; line-height:1.1; }
+  .tool .cost { font-size:11px; color:#F9AB00; font-weight:800; }
+  .tool.sel { border-color:#1A73E8; background:#E8F0FE; }
+  .tool:disabled { opacity:.38; }
+  .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; background:#F8F9FAF2; color:#202124; text-align:center;
+    padding:20px; z-index:5; overflow-y:auto; }
+  .screen h1 { font-size:32px; margin:0 0 6px; }
+  .screen h2 { font-size:20px; margin:10px 0 8px; }
+  .screen p { margin:4px 0; color:#5F6368; font-size:15px; max-width:360px; }
+  .bigbtn { margin-top:16px; padding:14px 38px; font-size:18px; font-weight:800; border:none;
+    border-radius:14px; background:#1A73E8; color:#fff; cursor:pointer; box-shadow:0 2px 6px #0003; }
+  .cards { display:flex; gap:10px; margin:10px 0; flex-wrap:wrap; justify-content:center; }
+  .card { width:110px; padding:12px 6px; background:#fff; border-radius:14px; border:3px solid #DADCE0;
+    cursor:pointer; color:#202124; box-shadow:0 1px 4px #0002; }
+  .card.sel { border-color:#1A73E8; background:#E8F0FE; }
+  .card.big { width:150px; padding:18px 8px; }
+  .card .em { font-size:34px; }
+  .card .nm { font-size:13px; font-weight:800; margin-top:4px; }
+  .card .sub { font-size:10px; color:#5F6368; margin-top:3px; }
+  .wallets { font-size:14px; font-weight:700; color:#5F6368; margin-top:10px; }
+  .hidden { display:none !important; }
+  #muteBtn { position:absolute; top:8px; right:10px; z-index:6; width:42px; height:42px; border-radius:50%;
+    border:1px solid #DADCE0; background:#fff; font-size:19px; cursor:pointer; box-shadow:0 1px 4px #0003;
+    display:flex; align-items:center; justify-content:center; }
+  @media (max-width: 480px) {
+    .screen h1 { font-size:24px; } .screen h2 { font-size:16px; } .screen p { font-size:13px; }
+    .cards { gap:6px; }
+    .card { width:86px; padding:8px 4px; } .card.big { width:118px; padding:12px 6px; }
+    .card .em { font-size:24px; } .card .nm { font-size:11px; }
+    .tool { width:80px; height:56px; font-size:10px; } .tool .ic { font-size:17px; }
+    #toolbar { min-height:66px; padding:6px 6px; gap:6px; }
+    .bigbtn { padding:12px 26px; font-size:16px; }
+    #muteBtn { width:36px; height:36px; font-size:16px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <button id="muteBtn" aria-label="Mute or unmute game sound">🔊</button>
+  <div id="toolbar"></div>
+
+  <div class="screen" id="sideScreen">
+    <h1>🍔 Free if Late!</h1>
+    <p>Order food. If it arrives <b>LATE</b>, it's <b>FREE</b>!</p>
+    <h2>Choose your side</h2>
+    <div class="cards">
+      <div class="card big" id="sideSab"><div class="em">😈</div><div class="nm">Hungry Customer</div><div class="sub">Sabotage the delivery — make it LATE and eat free</div></div>
+      <div class="card big" id="sideRider"><div class="em">🛵</div><div class="nm">Delivery Hero</div><div class="sub">Steer the bike — beat the saboteur's traps and deliver ON TIME</div></div>
+    </div>
+    <div class="wallets" id="walletsSide"></div>
+  </div>
+
+  <div class="screen hidden" id="orderScreen">
+    <h2 style="margin-top:0">Delivery time</h2>
+    <div class="cards">
+      <div class="card" id="dayCard"><div class="em">☀️</div><div class="nm">Day</div><div class="sub">normal city, normal tips</div></div>
+      <div class="card" id="nightCard"><div class="em">🌙</div><div class="nm">Night</div><div class="sub">2× coins! dark streets, headlights only</div></div>
+    </div>
+    <div id="vehWrap" class="hidden">
+      <h2 style="margin-top:0">Pick your ride <span style="font-size:12px;color:#5F6368">(paid from 🛵 coins each trip)</span></h2>
+      <div class="cards" id="vehCards"></div>
+    </div>
+    <h2 style="margin-top:0">Pick a restaurant</h2>
+    <div class="cards" id="restCards"></div>
+    <h2>Pick your food</h2>
+    <div class="cards" id="foodCards"></div>
+    <button class="bigbtn" id="orderBtn">Place Order 🛵</button>
+  </div>
+
+  <div class="screen hidden" id="winScreen">
+    <h1 id="winTitle">🎉 FREE FOOD!</h1>
+    <p id="winText"></p>
+    <p id="powerText" style="color:#1A73E8;font-weight:700"></p>
+    <div class="wallets" id="walletsWin"></div>
+    <button class="bigbtn" id="nextBtn">Next Order ▶</button>
+  </div>
+
+  <div class="screen hidden" id="loseScreen">
+    <h1 id="loseTitle">📦 Delivered on time…</h1>
+    <p id="loseSub">You had to pay full price. Ouch.</p>
+    <p id="loseText" style="font-size:17px;color:#202124;font-weight:700"></p>
+    <div class="wallets" id="walletsLose"></div>
+    <button class="bigbtn" id="retryBtn">Order Again 🔁</button>
+  </div>
+
+  <div class="screen hidden" id="pauseScreen"><h1>⏸ PAUSED</h1></div>
+
+  <div class="screen hidden" id="reviveScreen">
+    <h1 id="reviveTitle">🚫 TRAPPED!</h1>
+    <p id="reviveText">No coins, no way through. The food is getting cold…</p>
+    <button class="bigbtn" id="reviveBtn">📺 Watch ad → +50 🛵 coins</button>
+    <button class="bigbtn" id="giveUpBtn" style="background:#5F6368">Give up</button>
+  </div>
+</div>
+<script>
+"use strict";
+/* Free if Late! — original work. All art canvas/emoji, all audio + music synthesized in code. */
+
+/* ---------- Platform shim: Playgama Bridge if present, else localStorage ---------- */
+const Platform = (() => {
+  const hasBridge = () => typeof window.bridge !== "undefined";
+  let initialized = false;
+  const KEY = "snackSabotageSave";
+  return {
+    async init() {
+      if (hasBridge()) { try { await bridge.initialize(); initialized = true; } catch (e) {} }
+      return initialized;
+    },
+    ready() { if (initialized) { try { bridge.platform.sendMessage("game_ready"); } catch (e) {} } },
+    async save(data) {
+      const s = JSON.stringify(data);
+      if (initialized) { try { await bridge.storage.set([KEY], [s]); return; } catch (e) {} }
+      try { localStorage.setItem(KEY, s); } catch (e) {}
+    },
+    async load() {
+      if (initialized) {
+        try {
+          const data = await bridge.storage.get([KEY]);
+          if (data && data[0]) return typeof data[0] === "string" ? JSON.parse(data[0]) : data[0];
+        } catch (e) {}
+      }
+      try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch (e) {}
+      return null;
+    },
+    onPause(fn) {
+      if (initialized) { try { bridge.platform.on(bridge.EVENT_NAME.PAUSE_STATE_CHANGED, fn); } catch (e) {} }
+      document.addEventListener("visibilitychange", () => fn(document.hidden));
+    },
+    onAudio(fn) {
+      if (initialized) {
+        try {
+          fn(bridge.platform.isAudioEnabled !== false);
+          bridge.platform.on(bridge.EVENT_NAME.AUDIO_STATE_CHANGED, fn);
+        } catch (e) {}
+      }
+    },
+    showInterstitial() { if (initialized) { try { bridge.advertisement.showInterstitial(); } catch (e) {} } },
+    onAdActivity(fn) { // true while ANY ad is on screen — game must freeze and mute
+      if (!initialized) return;
+      const map = s => (s === "opened" || s === "loading" ? true
+                      : (s === "closed" || s === "failed" || s === "rewarded" ? false : null));
+      const h = s => { const v = map(s); if (v !== null) fn(v); };
+      try {
+        bridge.advertisement.on(bridge.EVENT_NAME.INTERSTITIAL_STATE_CHANGED, h);
+        bridge.advertisement.on(bridge.EVENT_NAME.REWARDED_STATE_CHANGED, h);
+      } catch (e) {}
+    },
+    showRewarded(onReward) {
+      if (initialized) {
+        try {
+          const h = st => { if (st === "rewarded") onReward(); if (st === "rewarded" || st === "closed" || st === "failed") bridge.advertisement.off?.(bridge.EVENT_NAME.REWARDED_STATE_CHANGED, h); };
+          bridge.advertisement.on(bridge.EVENT_NAME.REWARDED_STATE_CHANGED, h);
+          bridge.advertisement.showRewarded();
+          return;
+        } catch (e) {}
+      }
+      setTimeout(onReward, 600); // local mock
+    },
+  };
+})();
+
+/* ---------- Synthesized audio ---------- */
+const Sound = (() => {
+  let ctx = null, muted = false;
+  function ac() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (ctx && ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  function blip(freq, dur = 0.12, type = "sine", gain = 0.16) {
+    const c = ac(); if (!c || muted) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(gain, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+    o.connect(g).connect(c.destination);
+    o.start(); o.stop(c.currentTime + dur);
+  }
+  function note(freq, t, dur, type, gain) {
+    const c = ac(); if (!c || muted) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  // original tune: bouncy C-major pentatonic, composed in code — no samples, no copyright
+  const LEAD = [523, 0, 659, 784, 0, 659, 587, 0, 523, 659, 0, 880, 784, 0, 659, 587,
+                523, 0, 659, 784, 0, 880, 1047, 0, 880, 784, 0, 659, 587, 523, 587, 0];
+  const BASS = [131, 0, 0, 0, 165, 0, 0, 0, 175, 0, 0, 0, 196, 0, 0, 0,
+                131, 0, 0, 0, 165, 0, 0, 0, 175, 0, 0, 0, 196, 0, 147, 0];
+  let nextNote = 0, step = 0;
+  return {
+    unlock() { ac(); },
+    musicTick() {
+      const c = ac(); if (!c || muted) return;
+      if (nextNote < c.currentTime - 1) nextNote = c.currentTime;
+      while (nextNote < c.currentTime + 0.25) {
+        const l = LEAD[step % 32], b = BASS[step % 32];
+        if (l) note(l, nextNote, 0.18, "triangle", 0.028);
+        if (b) note(b, nextNote, 0.34, "sine", 0.045);
+        nextNote += 0.19; step++;
+      }
+    },
+    place() { blip(110, 0.12, "square", 0.12); blip(70, 0.2, "sine", 0.14); },
+    slick() { blip(240, 0.18, "triangle", 0.1); },
+    rain() { [500, 420, 360].forEach((f, i) => setTimeout(() => blip(f, 0.2, "sine", 0.08), i * 90)); },
+    smash() { blip(90, 0.25, "sawtooth", 0.14); },
+    refund() { blip(700, 0.08, "sine", 0.1); },
+    deny() { blip(160, 0.1, "square", 0.08); },
+    win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => blip(f, 0.22, "sine", 0.16), i * 100)); },
+    lose() { blip(220, 0.4, "sawtooth", 0.09); setTimeout(() => blip(150, 0.6, "sawtooth", 0.09), 200); },
+    tick() { blip(880, 0.05, "sine", 0.06); },
+    honk() { blip(370, 0.14, "square", 0.1); setTimeout(() => blip(370, 0.18, "square", 0.1), 190); },
+    coin() { blip(988, 0.09, "sine", 0.12); setTimeout(() => blip(1319, 0.14, "sine", 0.12), 70); },
+    dog() { blip(600, 0.08, "square", 0.1); setTimeout(() => blip(700, 0.08, "square", 0.1), 120); },
+    jump() { blip(400, 0.1, "sine", 0.12); setTimeout(() => blip(650, 0.15, "sine", 0.12), 80); },
+    setMuted(m) { muted = m; },
+  };
+})();
+function haptic(ms) { if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} } }
+function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
+
+/* ---------- Menu data (all original names) ---------- */
+const RESTAURANTS = [
+  { em: "🍕", name: "Pepper Planet", sub: "Pizza & garlic knots" },
+  { em: "🍔", name: "Burger Blastoff", sub: "Smash burgers" },
+  { em: "🍜", name: "Noodle Nebula", sub: "Ramen & dumplings" },
+];
+const FOODS = [
+  [ { em: "🍕", name: "Volcano Pizza" }, { em: "🥖", name: "Garlic Comet" }, { em: "🥤", name: "Lava Cola" } ],
+  [ { em: "🍔", name: "Mega Smash" }, { em: "🍟", name: "Moon Fries" }, { em: "🌶️", name: "Fire Wings" } ],
+  [ { em: "🍜", name: "Rocket Ramen" }, { em: "🥟", name: "Dumpling Duo" }, { em: "🍡", name: "Star Mochi" } ],
+];
+const POI_EMOJI = ["🏪", "⛽", "🏥", "🏫", "🏦", "☕"];
+const VEHICLES = [
+  { em: "🛵", name: "Scooter",    cost: 0,  spd: 1    },
+  { em: "🏍️", name: "Speed Bike", cost: 15, spd: 1.22 },
+  { em: "🚗", name: "Mini Car",   cost: 40, spd: 1.45 },
+];
+
+/* ---------- Sabotage tools (unlock by level) ---------- */
+const TOOLS = [
+  { key: "block",  em: "🚧", name: "Roadblock", cost: 20, unlock: 1, tile: true  },
+  { key: "slick",  em: "🛢️", name: "Oil Slick", cost: 14, unlock: 1, tile: true  },
+  { key: "rain",   em: "🌧️", name: "Rain 8s",   cost: 30, unlock: 2, tile: false },
+  { key: "pit",    em: "🕳️", name: "Pothole",   cost: 16, unlock: 3, tile: true  },
+  { key: "light",  em: "🚦", name: "Red Light", cost: 22, unlock: 4, tile: true  },
+  { key: "dog",    em: "🐶", name: "Dog Chase", cost: 34, unlock: 5, tile: false },
+  { key: "parade", em: "🎉", name: "Parade 5s", cost: 40, unlock: 7, tile: true  },
+];
+
+/* ---------- Generated map ---------- */
+const GW = 12, GH = 12;
+let roadSet = new Set(), waterSet = new Set(), poi = new Map();
+let dirtSet = new Set(), lightSet = new Set();   // dirt shortcuts (nails!) & street lights
+let night = false;
+const isDirt = (r, c) => dirtSet.has(key(r, c));
+let dirtPhase = new Map();   // one shared rhythm per shortcut corridor — clear the whole cut in one window
+// nails pop on a fixed rhythm: up 0.5s, down 1.4s — wait for the drop, then commit
+function nailUp(r, c, t) { return ((t + (dirtPhase.get(key(r, c)) || 0)) % 1.9) < 0.5; }
+let REST = { r: 1, c: 1 }, HOME = { r: 10, c: 10 };
+const key = (r, c) => r + "," + c;
+const isRoad = (r, c) => r >= 0 && r < GH && c >= 0 && c < GW && roadSet.has(key(r, c));
+let ROAD_TILES = [];
+function randRoad() { return ROAD_TILES[(Math.random() * ROAD_TILES.length) | 0]; }
+
+function bfs(from, to, blocked) {
+  const q = [from], prev = new Map([[key(from.r, from.c), null]]);
+  while (q.length) {
+    const n = q.shift();
+    if (n.r === to.r && n.c === to.c) {
+      const path = [];
+      let k = key(n.r, n.c), cur = n;
+      while (cur) { path.unshift(cur); cur = prev.get(k); if (cur) k = key(cur.r, cur.c); }
+      return path;
+    }
+    for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const r = n.r + dr, c = n.c + dc, k2 = key(r, c);
+      if (!isRoad(r, c) || prev.has(k2)) continue;
+      if (blocked && blocked.has(k2) && !(r === to.r && c === to.c)) continue;
+      prev.set(k2, n); q.push({ r, c });
+    }
+  }
+  return null;
+}
+
+function genMap(lv) {
+  roadSet = new Set();
+  for (let r = 0; r < GH; r++) for (let c = 0; c < GW; c++)
+    if (r % 3 === 1 || c % 3 === 1) roadSet.add(key(r, c));
+  // new route every level: pick start/end among corner intersections
+  const corners = [{ r: 1, c: 1 }, { r: 1, c: 10 }, { r: 10, c: 1 }, { r: 10, c: 10 }];
+  REST = pick(corners);
+  HOME = corners.reduce((best, p) =>
+    Math.abs(p.r - REST.r) + Math.abs(p.c - REST.c) > Math.abs(best.r - REST.r) + Math.abs(best.c - REST.c) ? p : best);
+  // low levels: prune roads → chokepoints (easy for the saboteur)
+  const prune = Math.max(0, 12 - lv);
+  const cand = [...roadSet].filter(k => k !== key(REST.r, REST.c) && k !== key(HOME.r, HOME.c));
+  for (let i = cand.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [cand[i], cand[j]] = [cand[j], cand[i]]; }
+  let pruned = 0;
+  for (const k of cand) {
+    if (pruned >= prune) break;
+    roadSet.delete(k);
+    if (bfs(REST, HOME, null)) pruned++; else roadSet.add(k);
+  }
+  // dirt shortcuts: 2-tile mud corridors cut straight through a city block, joining two
+  // parallel roads mid-block — genuinely shorter, unblockable, guarded by rhythm nails
+  dirtSet = new Set(); dirtPhase = new Map();
+  const corridors = Math.min(3, 1 + ((lv - 1) / 3 | 0));
+  let carved = 0, guard = 0;
+  while (carved < corridors && guard++ < 300) {
+    const vertical = Math.random() < 0.5;
+    const a = 1 + 3 * ((Math.random() * 3) | 0);          // road row/col index (1,4,7)
+    const b = a + 3;                                      // the parallel road
+    const m = (Math.random() * (vertical ? GW : GH)) | 0; // where along the block to cut
+    if (b >= (vertical ? GH : GW)) continue;
+    const t1 = vertical ? { r: a + 1, c: m } : { r: m, c: a + 1 };
+    const t2 = vertical ? { r: a + 2, c: m } : { r: m, c: a + 2 };
+    const e1 = vertical ? { r: a, c: m } : { r: m, c: a };
+    const e2 = vertical ? { r: b, c: m } : { r: m, c: b };
+    const k1 = key(t1.r, t1.c), k2 = key(t2.r, t2.c);
+    if (!isRoad(e1.r, e1.c) || !isRoad(e2.r, e2.c)) continue;             // both ends must join roads
+    if (roadSet.has(k1) || roadSet.has(k2) || waterSet.has(k1) || waterSet.has(k2)) continue;
+    const phase = carved * 0.8;
+    roadSet.add(k1); roadSet.add(k2);
+    dirtSet.add(k1); dirtSet.add(k2);
+    dirtPhase.set(k1, phase); dirtPhase.set(k2, phase);
+    carved++;
+  }
+  // street lights on some intersections (night: pools of safety & visibility)
+  lightSet = new Set();
+  for (let r = 1; r < GH; r += 3) for (let c = 1; c < GW; c += 3)
+    if (isRoad(r, c) && (r * 13 + c * 7 + lv) % 3 === 0) lightSet.add(key(r, c));
+  // decorations: ponds + points of interest on building tiles
+  waterSet = new Set(); poi = new Map();
+  for (let r = 0; r < GH; r++) for (let c = 0; c < GW; c++) {
+    const k = key(r, c);
+    if (roadSet.has(k)) continue;
+    const h = (r * 31 + c * 17 + lv * 7) % 23;
+    if (h === 3 || h === 15) waterSet.add(k);
+    else if (h % 7 === 1) poi.set(k, POI_EMOJI[(r * 3 + c + lv) % POI_EMOJI.length]);
+  }
+  ROAD_TILES = [];
+  for (let r = 0; r < GH; r++) for (let c = 0; c < GW; c++) if (isRoad(r, c)) ROAD_TILES.push({ r, c });
+}
+
+/* ---------- Game state ---------- */
+let state = "side";                  // side | order | countdown | play | win | lose
+let mode = "sab";                    // sab (you sabotage) | rider (you deliver)
+let level = 1, best = 1, timer = 0, promised = 0, cd = 0, vehicle = 0, reviveOffered = false;
+let wallets = { player: 0, rider: 0 };
+let blocks = new Map();              // key -> {type: block|slick|pit|light|parade, until?}
+let rainUntil = 0, dogUntil = 0, now = 0;
+let rider = null, tool = "block";
+let restSel = 0, foodSel = 0;
+let bubble = null;
+let paused = false, adOpen = false, gameOver = false;
+const frozen = () => paused || adOpen;
+let lastAdAt = -1e9, saveDirty = false, lastSaveAt = 0;
+let stats = { sabotages: 0, wins: 0 };
+let traffic = new Set(), trafficUntil = 0, nextTrafficAt = 0, cars = [], jamCars = [], parts = [];
+let aiNextAt = 0, boosting = false, riderSpent = 0;
+let userMuted = false, platformMuted = false;
+function applyMute() {
+  Sound.setMuted(userMuted || platformMuted);
+  el("muteBtn").textContent = (userMuted || platformMuted) ? "🔇" : "🔊";
+}
+function riderCanSpend(n) { return wallets.rider >= n && riderSpent + n <= riderBudget(level); }
+
+const riderSpeed = lv => Math.min(3.0, 1.35 + (lv - 1) * 0.14);
+const smashTime = lv => Math.max(1.2, 4.2 - (lv - 1) * 0.35);
+const hasRaincoat = lv => lv >= 4;
+const timerFactor = lv => Math.max(1.3, 2.1 - (lv - 1) * 0.08);
+const riderBudget = lv => 40 + (lv - 1) * 8;   // AI smash spending cap per round, no matter how rich he gets
+const roundAward = lv => 20 + lv * 5;
+const POWER_TEXT = {
+  2: "Level 2: rider gets a faster bike — and RAIN unlocks for you!",
+  3: "Level 3: rider smashes quicker AND learns RAMPAGE 💪 (3 smashes → fury!) — POTHOLE unlocks for you!",
+  4: "Level 4: rider has a raincoat — RED LIGHT unlocks!",
+  5: "Level 5: rider gets TURBO — DOG CHASE unlocks!",
+  6: "Level 6: rider can JUMP one roadblock per trip!",
+  7: "Level 7: rider is furious — STREET PARADE unlocks!",
+  10: "Level 10: the LEGEND rides. Good luck!",
+};
+
+/* unified money: sabotage spends 😈 wallet, riding spends 🛵 wallet — always visible, always saved */
+function myKey() { return mode === "sab" ? "player" : "rider"; }
+function myCoins() { return wallets[myKey()]; }
+function spendCoins(n) { wallets[myKey()] = Math.max(0, Math.round((wallets[myKey()] - n) * 10) / 10); saveDirty = true; }
+function addCoins(n, side) { wallets[side || myKey()] += Math.round(n); saveDirty = true; }
+
+function spawnDebris(c, r) {
+  for (let i = 0; i < 12; i++)
+    parts.push({ x: c + 0.5, y: r + 0.5, vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 3 - 1,
+                 life: 0.7 + Math.random() * 0.4, col: Math.random() < 0.5 ? "#F29900" : "#FBBC04" });
+}
+let floaters = [], shake = 0, hudPulse = 0;
+function floatText(c, r, text, col) { floaters.push({ x: c, y: r, text, col: col || "#34A853", life: 1.1 }); }
+function coinBurst(c, r, amount) {
+  for (let i = 0; i < 9; i++)
+    parts.push({ ptype: "coin", x: c + 0.5, y: r + 0.5, vx: (Math.random() - 0.5) * 5, vy: -Math.random() * 4 - 1,
+                 life: 1.6, col: "#F9AB00" });
+  for (let i = 0; i < 8; i++) // sparkle ring
+    parts.push({ x: c + 0.5 + Math.cos(i / 8 * 6.28) * 0.3, y: r + 0.5 + Math.sin(i / 8 * 6.28) * 0.3,
+                 vx: Math.cos(i / 8 * 6.28) * 3, vy: Math.sin(i / 8 * 6.28) * 3, life: 0.5, col: "#FFF176" });
+  floatText(c + 0.5, r, "+" + amount, "#F9AB00");
+  Sound.coin(); haptic(20);
+}
+
+function newRider() {
+  const path = bfs(REST, HOME, null);
+  return { path, seg: 0, t: 0, smashing: 0, smashTotal: 1, smashKey: null,
+           x: REST.c, y: REST.r, jumps: level >= 6 ? 1 : 0, jumpKey: null,
+           rage: 0, rampageUntil: 0,
+           turboUntil: 0, turboUsed: false, stopUntil: 0, slickUntil: 0, honked: false,
+           // player-rider fields
+           at: { ...REST }, next: null, dir: null, queued: null };
+}
+function startLevel() {
+  genMap(level);
+  blocks = new Map(); rainUntil = 0; dogUntil = 0; bubble = null; parts = [];
+  traffic = new Set(); trafficUntil = 0; nextTrafficAt = now + (night ? 20 : 5) + Math.random() * 4;
+  aiNextAt = now + 2.5; nextYawnAt = now + 10 + Math.random() * 5;
+  cars = [];
+  for (let i = 0; i < (night ? 1 : 4); i++) {        // the city sleeps at night
+    const s = randRoad(), p = bfs(s, randRoad(), null);
+    if (p && p.length > 1) cars.push({ path: p, seg: 0, t: Math.random(), col: ["#4FC3F7", "#FFD54F", "#BA68C8", "#81C784"][i] });
+  }
+  rider = newRider();
+  if (wallets.player < 60) wallets.player = 60;   // round allowance — both sides can always play
+  if (wallets.rider < 40) wallets.rider = 40;
+  if (mode === "rider") spendCoins(VEHICLES[vehicle].cost);
+  const spd = riderSpeed(level) * (mode === "rider" ? VEHICLES[vehicle].spd : 1);
+  const travel = (rider.path.length - 1) / spd;
+  promised = Math.ceil(travel * (mode === "rider" ? 1.55 : timerFactor(level)));
+  timer = promised;
+  state = "countdown"; cd = 3.5; reviveOffered = false; gameOver = false; riderSpent = 0;
+  const td = toolDef(tool);
+  if (!td || !td.tile || td.unlock > level) tool = "block";  // never leave a locked tool selected
+  buildToolbar();
+  show("sideScreen", false); show("orderScreen", false); show("winScreen", false); show("loseScreen", false);
+  saveDirty = true;
+}
+
+/* ---------- AI rider (sab mode) ---------- */
+function hardBlocked() {
+  return new Set([...blocks.keys()].filter(k => {
+    const t = blocks.get(k).type;
+    return t === "block" || t === "parade";
+  }));
+}
+function seenByRider(k) {
+  if (!night) return true;                          // daytime: sees the whole map
+  if (lightSet.has(k)) return true;                 // street light reveals it
+  const [r, c] = k.split(",").map(Number);
+  return Math.abs(r - rider.y) + Math.abs(c - rider.x) <= 3;  // else: headlight range only
+}
+function replan() {
+  if (!rider || mode === "rider") return;
+  const from = rider.path[Math.min(rider.seg + 1, rider.path.length - 1)];
+  const sp = riderSpeed(level);
+  const visible = k => seenByRider(k);
+  const hardSeen = new Set([...hardBlocked()].filter(visible));
+  const parades = new Set([...blocks.keys()].filter(k => blocks.get(k).type === "parade" && visible(k)));
+  const avoid = bfs(from, HOME, hardSeen);
+  const thru = bfs(from, HOME, parades) || bfs(from, HOME, null); // parades are hard walls unless truly stuck
+  const nBlocks = thru.reduce((n, t) => n + (blocks.get(key(t.r, t.c))?.type === "block" ? 1 : 0), 0);
+  const costAvoid = avoid ? (avoid.length - 1) / sp : Infinity;
+  // conscious choice: smash only if genuinely faster AND he can afford it (10 🛵 coins per block)
+  const canAfford = riderCanSpend(nBlocks * 10);
+  const costThru = canAfford ? (thru.length - 1) / sp + nBlocks * smashTime(level) : Infinity;
+  let p = costThru < costAvoid ? thru : avoid;
+  if (!p) p = thru; // broke AND walled-in: ride to the wall and wait — timer decides
+  const cur = rider.path[rider.seg];
+  rider.path = [cur, ...p.slice(0)]; rider.seg = 0;
+}
+let flatEnd = false, reviveKind = "trapped", nextYawnAt = 0;
+const rampageReady = () => level >= 3 && rider && rider.rage >= 100;
+const rampaging = () => rider && now < rider.rampageUntil;
+function addRage(n) {
+  if (!rider || level < 3) return;
+  const was = rider.rage;
+  rider.rage = Math.min(100, rider.rage + n);
+  if (was < 100 && rider.rage >= 100)
+    bubble = { text: mode === "sab" ? "That's IT — I'm FURIOUS!! 💪" : "RAMPAGE ready! 💪", until: now + 2 };
+}
+function startRampage() {
+  rider.rage = 0; rider.rampageUntil = now + 2.6;
+  Sound.smash(); Sound.honk(); haptic([50, 40, 50]);
+  bubble = { text: "🔥 RAMPAGE!! OUTTA MY WAY!!", until: now + 2.4 };
+}
+function flatTire() {
+  if (state !== "play") return;
+  shake = 0.6; haptic(200); Sound.lose();
+  spawnDebris(rider.x, rider.y);
+  bubble = { text: "💥 FLAT TIRE!!", until: now + 2.5 };
+  if (mode === "sab") { flatEnd = true; endRound(true); }
+  else {
+    reviveKind = "flat"; reviveOffered = true; paused = true;
+    el("reviveTitle").textContent = "💥 FLAT TIRE!";
+    el("reviveText").textContent = "You hit a nail on the shortcut! The tire is done.";
+    el("reviveBtn").textContent = "📺 Watch ad → 🔧 patch the tire";
+    show("reviveScreen", true);
+  }
+}
+function enterTile(r, tile) {
+  const k = key(tile.r, tile.c);
+  if (isDirt(tile.r, tile.c) && nailUp(tile.r, tile.c, now)) return flatTire(); // nails don't care about fury
+  const b = blocks.get(k);
+  if (!b) return;
+  if (b.type === "block" && rampaging()) {           // plowed straight through
+    blocks.delete(k); spawnDebris(tile.c, tile.r);
+    Sound.smash(); shake = Math.max(shake, 0.35);
+    return;
+  }
+  if (b.type === "slick") {
+    blocks.delete(k); r.slickUntil = now + 2.4; Sound.slick();
+    addRage(12);
+    bubble = { text: "Whoa! Slippery! 🌀", until: now + 1.6 };
+  } else if (b.type === "light") {
+    blocks.delete(k); r.stopUntil = now + 2.5; Sound.deny();
+    addRage(12);
+    bubble = { text: pick(["A red light?! HERE?!", "Who hacked this signal?! 🚦"]), until: now + 2 };
+  }
+}
+function updateRiderAI(dt) {
+  const r = rider;
+  if (r.smashing > 0) {
+    r.smashing -= dt;
+    if (r.smashing <= 0) {
+      const [br, bc] = r.smashKey.split(",").map(Number);
+      spawnDebris(bc, br);
+      blocks.delete(r.smashKey); Sound.smash(); haptic(30);
+      wallets.rider = Math.max(0, wallets.rider - 10); riderSpent += 10; // smashing costs him
+      addRage(34);                                            // …and fuels his fury
+      addCoins(12 + level * 2, "player");                     // …and pays you for the delay
+      coinBurst(bc, br, 12 + level * 2);
+      shake = 0.4; r.sweatUntil = now + 1.8;                  // he EARNED that breakthrough
+      bubble = { text: pick(["Nice try! 😤", "SMASH!", "Phew… made it through! 😅", "I've got food to deliver!"]), until: now + 2 };
+      replan();
+    }
+    return;
+  }
+  if (now < r.stopUntil) return;
+  if (r.seg >= r.path.length - 1) return;
+  if (night) { // headlights: panic-brake when a trap suddenly appears out of the dark
+    if (!r.known) r.known = new Set();
+    for (const [k, b] of blocks) {
+      if ((b.type !== "block" && b.type !== "parade") || r.known.has(k)) continue;
+      if (seenByRider(k)) {
+        r.known.add(k);
+        r.stopUntil = Math.max(r.stopUntil, now + 0.7);
+        bubble = { text: pick(["WHOA!! Where did THAT come from?!", "😱 BRAKES!!", "I can't see anything out here!"]), until: now + 1.8 };
+        return;
+      }
+    }
+  }
+  const nxt = r.path[r.seg + 1];
+  const nk = key(nxt.r, nxt.c);
+  const b = blocks.get(nk);
+  if (b && b.type === "parade") { replan(); if (key(rider.path[Math.min(rider.seg+1, rider.path.length-1)].r, rider.path[Math.min(rider.seg+1, rider.path.length-1)].c) === nk) return; }
+  // nail gate: a careful rider times the nails — but sometimes he gambles…
+  if (isDirt(nxt.r, nxt.c) && nailUp(nxt.r, nxt.c, now)) {
+    if (r.gambleKey !== nk) { r.gambleKey = nk; r.gamble = Math.random() < Math.max(0.04, 0.16 - (level - 1) * 0.015); }
+    if (!r.gamble && nailUp(nxt.r, nxt.c, now + 0.35)) {
+      if (!r.nailBubbled) { r.nailBubbled = true; bubble = { text: "Whoa — nails! Wait for it…", until: now + 1.6 }; }
+      return;
+    }
+  } else r.nailBubbled = false;
+  const b2 = blocks.get(key(r.path[r.seg + 1].r, r.path[r.seg + 1].c));
+  if (b2 && b2.type === "block" && rampageReady() && !rampaging()) { startRampage(); replan(); }
+  if (b2 && b2.type === "block" && !rampaging() && r.jumpKey !== key(r.path[r.seg + 1].r, r.path[r.seg + 1].c)) {
+    if (r.jumps > 0) {
+      r.jumps--; r.jumpKey = key(r.path[r.seg + 1].r, r.path[r.seg + 1].c); Sound.jump();
+      bubble = { text: "RAMP JUMP! 🤸", until: now + 2 };
+    } else if (riderCanSpend(10)) {
+      r.smashing = smashTime(level); r.smashTotal = r.smashing; r.smashKey = key(r.path[r.seg + 1].r, r.path[r.seg + 1].c);
+      bubble = { text: pick(["Hey! Who put this here?!", "Grrr… a roadblock!", "I'll push through!"]), until: now + 2 };
+      return;
+    } else {
+      bubble = { text: "I'm broke… can't smash 😭", until: now + 2 };
+      return; // waits at the wall — the clock is your friend
+    }
+  }
+  // turbo: level 5+ rider panics when running late
+  if (level >= 5 && !r.turboUsed) {
+    const remain = (r.path.length - 1 - r.seg) / riderSpeed(level);
+    if (timer < remain) { r.turboUsed = true; r.turboUntil = now + 2.5; bubble = { text: "TURBO TIME! 🔥", until: now + 2 }; }
+  }
+  let sp = riderSpeed(level);
+  if (night) sp *= 0.88;             // careful driving in the dark
+  if (rampaging()) sp *= 1.4;        // fury mode
+  if (now < r.turboUntil) sp *= 1.6;
+  if (now < rainUntil) sp *= hasRaincoat(level) ? 0.8 : 0.55;
+  if (now < dogUntil) sp *= 0.5;
+  if (now < r.slickUntil) sp *= 0.4;
+  const curTile = r.path[r.seg];
+  if (isDirt(curTile.r, curTile.c)) sp *= 0.72;      // mud
+  if (now < (r.yawnUntil || 0)) sp *= 0.6;           // sleepy night rider
+  const curB = blocks.get(key(curTile.r, curTile.c));
+  if (curB && curB.type === "pit") sp *= 0.5;
+  const inJam = traffic.has(key(curTile.r, curTile.c)) && now < trafficUntil;
+  if (inJam) {
+    sp *= 0.4;
+    if (!r.honked) { r.honked = true; Sound.honk(); bubble = { text: pick(["MOVE IT!! 📢", "Beep beep!! Come onnn!", "Not the traffic!! 😫"]), until: now + 2 }; }
+  } else r.honked = false;
+  r.t += dt * sp;
+  while (r.t >= 1 && r.seg < r.path.length - 1) {
+    r.t -= 1; r.seg++;
+    if (r.jumpKey === key(r.path[r.seg].r, r.path[r.seg].c)) r.jumpKey = null;
+    else enterTile(r, r.path[r.seg]);
+    if (state !== "play") return;                    // flat tire mid-crossing
+    if (r.seg >= r.path.length - 1) { r.t = 0; break; }
+    if (night && r.seg < r.path.length - 2) { replan(); break; }  // headlights reveal traps tile by tile
+    if (now < r.stopUntil) break;
+    const n2 = r.path[r.seg + 1], k2 = key(n2.r, n2.c);
+    const nb = blocks.get(k2);
+    if (nb && (nb.type === "parade" || (nb.type === "block" && !rampaging()))) break;
+  }
+  const a = r.path[r.seg], bb2 = r.path[Math.min(r.seg + 1, r.path.length - 1)];
+  r.x = a.c + (bb2.c - a.c) * r.t; r.y = a.r + (bb2.r - a.r) * r.t;
+}
+
+/* ---------- Player rider (rider mode) ---------- */
+function updateRiderPlayer(dt) {
+  const r = rider;
+  if (r.smashing > 0) {
+    r.smashing -= dt;
+    if (r.smashing <= 0) {
+      const [br, bc] = r.smashKey.split(",").map(Number);
+      spawnDebris(bc, br); blocks.delete(r.smashKey); Sound.smash(); haptic(30);
+      shake = 0.4; r.sweatUntil = now + 1.8;
+      addRage(34);
+    }
+    return;
+  }
+  if (now < r.stopUntil) return;
+  if (!r.next) {
+    const d = r.queued || r.dir;
+    if (d) {
+      const t = { r: r.at.r + d.dr, c: r.at.c + d.dc };
+      if (isRoad(t.r, t.c)) { r.dir = d; r.queued = null; r.next = t; r.t = 0; }
+      else r.queued = null;
+    }
+    if (!r.next) { r.x = r.at.c; r.y = r.at.r; return; }
+  }
+  const nb = blocks.get(key(r.next.r, r.next.c));
+  if (nb && nb.type === "parade") { r.next = null; return; } // wait or turn — parade is a wall
+  if (nb && nb.type === "block" && !rampaging()) {
+    if (wallets.rider >= 15) {
+      spendCoins(15); floatText(rider.x + 0.5, rider.y, "-15", "#E8453C");
+      r.smashing = 2.2; r.smashTotal = 2.2; r.smashKey = key(r.next.r, r.next.c);
+    } else {
+      r.next = null;
+      checkTrapped();
+    }
+    return;
+  }
+  let sp = riderSpeed(level) * VEHICLES[vehicle].spd + 0.3;
+  if (rampaging()) sp *= 1.4;
+  if (boosting && wallets.rider > 0) { sp *= 1.6; spendCoins(3 * dt); }
+  if (isDirt(r.at.r, r.at.c)) sp *= 0.72;            // mud
+  if (now < (r.yawnUntil || 0)) sp *= 0.6;           // sleepy
+  if (now < rainUntil) sp *= 0.6;
+  if (now < dogUntil) sp *= 0.5;
+  if (now < r.slickUntil) sp *= 0.4;
+  const curB = blocks.get(key(r.at.r, r.at.c));
+  if (curB && curB.type === "pit") sp *= 0.5;
+  if (traffic.has(key(r.at.r, r.at.c)) && now < trafficUntil) sp *= 0.4;
+  r.t += dt * sp;
+  if (r.t >= 1) {
+    r.at = r.next; r.next = null; r.t = 0;
+    enterTile(r, r.at);
+    // keep rolling in current direction through the loop above next frame
+    if (r.queued) { /* turn applied next frame */ }
+    else if (r.dir) {
+      const t = { r: r.at.r + r.dir.dr, c: r.at.c + r.dir.dc };
+      if (isRoad(t.r, t.c)) { r.next = t; }
+    }
+  }
+  const a = r.at, b = r.next || r.at;
+  r.x = a.c + (b.c - a.c) * r.t; r.y = a.r + (b.r - a.r) * r.t;
+}
+
+function checkTrapped() {
+  if (reviveOffered || state !== "play") return;
+  if (wallets.rider >= 15) return;
+  const esc = bfs(rider.at, HOME, hardBlocked());
+  if (esc) return;                                   // a free route exists — steer away!
+  reviveKind = "trapped"; reviveOffered = true; paused = true;
+  el("reviveTitle").textContent = "🚫 TRAPPED!";
+  el("reviveText").textContent = "No coins, no way through. The food is getting cold…";
+  el("reviveBtn").textContent = "📺 Watch ad → +50 🛵 coins";
+  show("reviveScreen", true);
+}
+el("reviveBtn").addEventListener("click", () => {
+  Platform.showRewarded(() => {
+    if (reviveKind === "flat") { rider.stopUntil = now + 1.5; }   // patching the tire
+    else { addCoins(50, "rider"); }
+    Sound.coin();
+    show("reviveScreen", false); paused = false; reviveOffered = false;
+  });
+});
+el("giveUpBtn").addEventListener("click", () => {
+  show("reviveScreen", false); paused = false;
+  endRound(false);
+});
+
+/* ---------- AI saboteur (rider mode) ---------- */
+function updateAISaboteur() {
+  if (now < aiNextAt) return;
+  aiNextAt = now + Math.max(2.2, 5.5 - level * 0.35);
+  const pool = TOOLS.filter(t => t.unlock <= level);
+  const t = pick(pool);
+  if (t.key === "rain") { rainUntil = now + 8; Sound.rain(); toast("😈 made it RAIN!"); return; }
+  if (t.key === "dog") { dogUntil = now + 3.5; Sound.dog(); toast("😈 released a dog! 🐶"); return; }
+  // place on the player's likely route
+  const from = rider.next || rider.at;
+  const p = bfs(from, HOME, hardBlocked()) || bfs(from, HOME, null);
+  if (!p || p.length < 4) return;
+  const spot = p[Math.min(2 + ((Math.random() * 3) | 0), p.length - 2)];
+  const k = key(spot.r, spot.c);
+  if (isDirt(spot.r, spot.c)) return;               // no tools on the shortcut — same rule for the AI
+  if (blocks.has(k) || (spot.r === HOME.r && spot.c === HOME.c) || (spot.r === REST.r && spot.c === REST.c)) return;
+  blocks.set(k, { type: t.key, placedAt: now, until: t.key === "parade" ? now + 5 : undefined });
+  Sound.place(); toast("😈 placed a " + t.em + " " + t.name + "!");
+}
+function toast(text) { bubble = { text, until: now + 2, toast: true }; }
+
+/* ---------- Player actions (sab mode) ---------- */
+function toolDef(k) { return TOOLS.find(t => t.key === k); }
+function tryPlace(r, c) {
+  window.__lastDeny = null;
+  if (state !== "play" || frozen() || mode !== "sab") return (window.__lastDeny = "state:" + state + " paused:" + paused);
+  if (!isRoad(r, c)) return (window.__lastDeny = "notroad " + r + "," + c);
+  const k = key(r, c);
+  if ((r === REST.r && c === REST.c) || (r === HOME.r && c === HOME.c)) return Sound.deny();
+  const existing = blocks.get(k);
+  if (existing) {
+    const back = Math.floor((toolDef(existing.type)?.cost || 14) * 0.4);
+    blocks.delete(k); addCoins(back); floatText(c + 0.5, r, "+" + back, "#34A853");
+    Sound.refund(); replan(); return;
+  }
+  const curT = rider.path[rider.seg], nxtT = rider.path[Math.min(rider.seg + 1, rider.path.length - 1)];
+  if ((r === curT.r && c === curT.c) || (r === nxtT.r && c === nxtT.c)) return Sound.deny();
+  if (isDirt(r, c)) { floatText(c + 0.5, r, "no tools on the shortcut!", "#E8453C"); return Sound.deny(); }
+  const t = toolDef(tool);
+  if (!t || !t.tile || t.unlock > level) return Sound.deny();
+  if (myCoins() < t.cost) return Sound.deny();
+  spendCoins(t.cost); floatText(c + 0.5, r, "-" + t.cost, "#E8453C");
+  blocks.set(k, { type: t.key, placedAt: now, until: t.key === "parade" ? now + 5 : undefined });
+  stats.sabotages++; saveDirty = true;
+  Sound.place();
+  if (t.key === "block" || t.key === "parade") replan();
+  haptic(15);
+}
+function tryInstant(k) {
+  if (state !== "play" || frozen() || mode !== "sab") return;
+  const t = toolDef(k);
+  if (!t || t.unlock > level || myCoins() < t.cost) return Sound.deny();
+  if (k === "rain") {
+    if (now < rainUntil) return Sound.deny();
+    spendCoins(t.cost); rainUntil = now + 8; Sound.rain();
+    bubble = { text: hasRaincoat(level) ? "Ha! I brought my raincoat! 🧥" : "Oh no, rain!! 😩", until: now + 2 };
+  } else if (k === "dog") {
+    if (now < dogUntil) return Sound.deny();
+    spendCoins(t.cost); dogUntil = now + 3.5; Sound.dog();
+    bubble = { text: pick(["A DOG?! Nice doggy…", "Why is it chasing MEEE 🐶"]), until: now + 2 };
+  }
+  stats.sabotages++; saveDirty = true;
+}
+
+/* ---------- Traffic & ambient cars ---------- */
+function updateTraffic(dt) {
+  if (now >= nextTrafficAt) {
+    nextTrafficAt = now + (night ? 24 : 9) + Math.random() * 5;
+    trafficUntil = now + 6;
+    traffic = new Set();
+    const seed = randRoad();
+    traffic.add(key(seed.r, seed.c));
+    for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]])
+      if (isRoad(seed.r + dr, seed.c + dc)) traffic.add(key(seed.r + dr, seed.c + dc));
+    jamCars = [];
+    for (const k of traffic) {
+      if (Math.random() < 0.35) continue;
+      const [jr, jc] = k.split(",").map(Number);
+      if ((jr === HOME.r && jc === HOME.c) || (jr === REST.r && jc === REST.c)) continue;
+      jamCars.push({ r: jr, c: jc, col: pick(["#4FC3F7", "#FFD54F", "#BA68C8", "#E57373", "#81C784"]),
+                     off: Math.random() * 0.3 - 0.15 });
+    }
+    if (state === "play") bubble = { text: "Ugh, rush hour! 🚗🚗", until: now + 2 };
+  }
+  for (const car of cars) {
+    if (car.seg >= car.path.length - 1) {
+      const p = bfs(car.path[car.path.length - 1], randRoad(), new Set([...blocks.keys()]));
+      if (p && p.length > 1) { car.path = p; car.seg = 0; car.t = 0; }
+      continue;
+    }
+    const nxt = car.path[car.seg + 1];
+    if (blocks.has(key(nxt.r, nxt.c))) { car.path = [car.path[car.seg]]; car.seg = 0; car.t = 0; continue; }
+    let sp = 1.1;
+    if (traffic.has(key(car.path[car.seg].r, car.path[car.seg].c)) && now < trafficUntil) sp = 0.35;
+    if (rider && car.x !== undefined && Math.hypot(car.x - rider.x, car.y - rider.y) < 0.7) sp = 0;
+    car.t += dt * sp;
+    while (car.t >= 1 && car.seg < car.path.length - 1) { car.t -= 1; car.seg++; }
+    const a = car.path[car.seg], b = car.path[Math.min(car.seg + 1, car.path.length - 1)];
+    car.x = a.c + (b.c - a.c) * car.t; car.y = a.r + (b.r - a.r) * car.t;
+  }
+}
+
+/* ---------- Win / lose ---------- */
+function riderArrived() {
+  if (mode === "sab") return rider.seg >= rider.path.length - 1 && rider.smashing <= 0;
+  return rider.at.r === HOME.r && rider.at.c === HOME.c && !rider.next;
+}
+function endRound(playerWon) {
+  // wallets: whoever performed, banks coins — human or AI; night pays double
+  const award = roundAward(level) * (night ? 2 : 1);
+  const lateWin = (mode === "sab" && playerWon) || (mode === "rider" && !playerWon);
+  if (lateWin) wallets.player += award; else wallets.rider += award;
+  if (playerWon) {
+    state = "win"; stats.wins++;
+    Sound.win(); Sound.coin(); haptic([40, 60, 40]);
+    el("winTitle").textContent = mode === "sab" ? (flatEnd ? "💥 FLAT TIRE — FREE FOOD!" : "🎉 FREE FOOD!") : "🏆 DELIVERED ON TIME!";
+    flatEnd = false;
+    el("winText").textContent = mode === "sab"
+      ? FOODS[restSel][foodSel].name + " arrived late — you eat FREE! +" + award + " coins. Level " + level + " cleared."
+      : "You beat the saboteur's traps! +" + award + " coins. Level " + level + " cleared.";
+    level++;
+    if (level > best) best = level;
+    el("powerText").textContent = POWER_TEXT[level] || ("Level " + level + ": everything gets a little tougher…");
+    el("walletsWin").textContent = walletLine();
+    show("winScreen", true);
+  } else {
+    gameOver = true; state = "lose";
+    Sound.lose(); haptic(120);
+    el("loseTitle").textContent = mode === "sab" ? "📦 Delivered on time…" : "⌛ Too late!";
+    el("loseSub").textContent = mode === "sab" ? "You had to pay full price. Ouch." : "The customer got FREE food. Your boss is not amused.";
+    el("loseText").textContent = "You reached Level " + level + " · Best: Level " + best;
+    el("walletsLose").textContent = walletLine();
+    show("loseScreen", true);
+  }
+  saveDirty = true; doSave();
+}
+function walletLine() { return "😈 Customer coins: " + Math.floor(wallets.player) + "   ·   🛵 Rider coins: " + Math.floor(wallets.rider); }
+function restart() {
+  if (now - lastAdAt > 90) { lastAdAt = now; Platform.showInterstitial(); }
+  level = 1;
+  show("loseScreen", false); show("sideScreen", true); state = "side";
+  el("walletsSide").textContent = walletLine();
+}
+
+/* ---------- Save (live, throttled) ---------- */
+function doSave() {
+  lastSaveAt = now; saveDirty = false;
+  Platform.save({ best, wins: stats.wins, sabotages: stats.sabotages, playerCoins: Math.floor(wallets.player), riderCoins: Math.floor(wallets.rider), muted: userMuted });
+}
+
+/* ---------- Rendering: Google-Maps-ish light theme ---------- */
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let TS = 30, MX = 0, MY = 50;
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const hud = 64;
+  TS = Math.floor(Math.min(w / GW, (h - hud) / GH));
+  MX = Math.floor((w - TS * GW) / 2); MY = hud + Math.floor((h - hud - TS * GH) / 2);
+}
+window.addEventListener("resize", resize);
+
+function draw() {
+  const w = cv.clientWidth, h = cv.clientHeight;
+  ctx.fillStyle = "#EDEBE3"; ctx.fillRect(0, 0, w, h);           // land fills every edge, any orientation
+  // faint out-of-town texture so wide-screen margins look intentional
+  const step = Math.max(26, TS);
+  for (let gy = step / 2; gy < h; gy += step) for (let gx = step / 2; gx < w; gx += step) {
+    if (gx > MX - step && gx < MX + GW * TS + step && gy > MY - step && gy < MY + GH * TS + step) continue;
+    const hsh2 = ((gx / step) | 0) * 7 + ((gy / step) | 0) * 13;
+    ctx.fillStyle = hsh2 % 5 === 0 ? "#DCE8D0" : "#E4E1D7";       // meadows & far blocks
+    roundRect(gx - step * 0.28, gy - step * 0.28, step * 0.56, step * 0.56, 5);
+    if (hsh2 % 5 === 0) {
+      ctx.fillStyle = "#C9DDB9";
+      ctx.beginPath(); ctx.arc(gx + step * 0.08, gy + step * 0.05, step * 0.12, 0, 7); ctx.fill();
+    }
+  }
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 18, (Math.random() - 0.5) * shake * 18);
+  // blocks & terrain
+  for (let r = 0; r < GH; r++) for (let c = 0; c < GW; c++) {
+    const x = MX + c * TS, y = MY + r * TS, k = key(r, c);
+    if (roadSet.has(k)) continue;
+    if (waterSet.has(k)) {
+      ctx.fillStyle = "#AADAFF"; ctx.fillRect(x, y, TS, TS);
+      ctx.fillStyle = "#8FC9F5";
+      ctx.beginPath(); ctx.ellipse(x + TS * 0.5, y + TS * 0.5 + Math.sin(now * 2 + r + c) * 2, TS * 0.3, TS * 0.1, 0, 0, 7); ctx.fill();
+      continue;
+    }
+    const hsh = (r * 31 + c * 17) % 7;
+    if (hsh === 0) { // park
+      ctx.fillStyle = "#C5E8B8"; ctx.fillRect(x, y, TS, TS);
+      ctx.fillStyle = "#7CC47F";
+      ctx.beginPath(); ctx.arc(x + TS * 0.35, y + TS * 0.45, TS * 0.16, 0, 7); ctx.arc(x + TS * 0.68, y + TS * 0.62, TS * 0.12, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = "#E2DED4"; ctx.fillRect(x + 1, y + 1, TS - 2, TS - 2);   // building lot
+      ctx.fillStyle = "#00000010";                                             // soft cast shadow
+      roundRect(x + TS * 0.22, y + TS * 0.24, TS * 0.64, TS * 0.64, 4);
+      ctx.fillStyle = "#D5D0C4";
+      roundRect(x + TS * 0.18, y + TS * 0.18, TS * 0.64, TS * 0.64, 4);        // building footprint
+      ctx.fillStyle = "#FFFFFF55";
+      ctx.fillRect(x + TS * 0.18, y + TS * 0.18, TS * 0.64, 2);                // sunlit roof edge
+      const p = poi.get(k);
+      if (p) { ctx.font = (TS * 0.34) + "px sans-serif"; ctx.textAlign = "center"; ctx.fillText(p, x + TS / 2, y + TS * 0.62); }
+    }
+  }
+  // roads: casing then fill (Google style)
+  for (const { r, c } of ROAD_TILES) {
+    const x = MX + c * TS, y = MY + r * TS;
+    ctx.fillStyle = "#D8D5CC"; ctx.fillRect(x - 1, y - 1, TS + 2, TS + 2);
+  }
+  for (const { r, c } of ROAD_TILES) {
+    const x = MX + c * TS, y = MY + r * TS;
+    if (isDirt(r, c)) {           // muddy shortcut
+      ctx.fillStyle = "#C9A66B"; ctx.fillRect(x + 1, y + 1, TS - 2, TS - 2);
+      ctx.fillStyle = "#A9855033";
+      ctx.fillRect(x + TS * 0.15, y + TS * 0.2, TS * 0.2, TS * 0.12);
+      ctx.fillRect(x + TS * 0.6, y + TS * 0.55, TS * 0.24, TS * 0.14);
+    } else { ctx.fillStyle = "#FFFFFF"; ctx.fillRect(x + 1, y + 1, TS - 2, TS - 2); }
+  }
+  // nails on dirt shortcuts: dots when down, spikes when UP
+  for (const k of dirtSet) {
+    const [r, c] = k.split(",").map(Number);
+    const x = MX + c * TS, y = MY + r * TS;
+    const up = nailUp(r, c, now);
+    for (let i = 0; i < 3; i++) {
+      const nx = x + TS * (0.28 + i * 0.22), ny = y + TS * 0.55;
+      if (up) {
+        ctx.fillStyle = "#4A4A4A";
+        ctx.beginPath(); ctx.moveTo(nx - 3.5, ny + 5); ctx.lineTo(nx + 3.5, ny + 5); ctx.lineTo(nx, ny - TS * 0.22); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#9E9E9E"; ctx.fillRect(nx - 1, ny - TS * 0.22, 2, 4);
+      } else {
+        ctx.fillStyle = "#8A6B3F";
+        ctx.beginPath(); ctx.arc(nx, ny + 3, 2.2, 0, 7); ctx.fill();
+      }
+    }
+  }
+  for (const { r, c } of ROAD_TILES) {
+    if (isDirt(r, c)) continue;
+    const x = MX + c * TS, y = MY + r * TS;
+    ctx.fillStyle = "#E3E0D8";
+    const horiz = isRoad(r, c - 1) || isRoad(r, c + 1);
+    const vert = isRoad(r - 1, c) || isRoad(r + 1, c);
+    if (horiz && vert) { // intersection: zebra
+      ctx.fillStyle = "#DDDAD1";
+      for (let i = 0; i < 3; i++) ctx.fillRect(x + TS * 0.2 + i * TS * 0.24, y + TS * 0.08, TS * 0.1, TS * 0.12);
+    } else if (horiz) ctx.fillRect(x + TS * 0.4, y + TS * 0.47, TS * 0.2, 2);
+    else if (vert) ctx.fillRect(x + TS * 0.47, y + TS * 0.4, 2, TS * 0.2);
+  }
+  // map edge: subtle frame so the city reads as a card
+  ctx.strokeStyle = "#00000014"; ctx.lineWidth = 2;
+  ctx.strokeRect(MX - 1, MY - 1, GW * TS + 2, GH * TS + 2);
+  // rush-hour congestion: Google-style red route tint
+  if (now < trafficUntil) {
+    ctx.fillStyle = "#E8453C44";
+    for (const k of traffic) {
+      const [r, c] = k.split(",").map(Number);
+      ctx.fillRect(MX + c * TS + 1, MY + r * TS + 1, TS - 2, TS - 2);
+    }
+  }
+  drawPin(REST, "#E8453C", RESTAURANTS[restSel].em);
+  drawPin(HOME, "#34A853", "🏠");
+  // stalled jam cars
+  if (now < trafficUntil) for (const jc of jamCars) {
+    const x = MX + jc.c * TS + TS / 2 + jc.off * TS, y = MY + jc.r * TS + TS / 2;
+    drawCar(x, y, jc.col);
+    if (((now * 2) | 0) % 2 === 0) {
+      ctx.fillStyle = "#E8453C"; ctx.font = "bold " + TS * 0.26 + "px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("!", x + TS * 0.28, y - TS * 0.12);
+    }
+  }
+  // hazards
+  const smashingKey = rider && rider.smashing > 0 ? rider.smashKey : null;
+  for (const [k, b] of blocks) {
+    const [r, c] = k.split(",").map(Number);
+    let x = MX + c * TS, y = MY + r * TS;
+    if (b.type === "block") {
+      if (k === smashingKey) x += Math.sin(now * 30) * TS * 0.06;
+      ctx.fillStyle = "#F29900"; ctx.fillRect(x + 3, y + TS * 0.3, TS - 6, TS * 0.4);
+      ctx.fillStyle = "#5F4200";
+      for (let i = 0; i < 3; i++) ctx.fillRect(x + 5 + i * (TS / 3), y + TS * 0.34, TS * 0.12, TS * 0.32);
+      if (k === smashingKey) {
+        const pr = 1 - rider.smashing / rider.smashTotal;
+        ctx.fillStyle = "#00000022"; ctx.fillRect(x + 4, y + TS * 0.12, TS - 8, 5);
+        ctx.fillStyle = "#E8453C"; ctx.fillRect(x + 4, y + TS * 0.12, (TS - 8) * pr, 5);
+      }
+    } else if (b.type === "slick") {
+      ctx.fillStyle = "#3C4043";
+      ctx.beginPath(); ctx.ellipse(x + TS / 2, y + TS / 2, TS * 0.34, TS * 0.24, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#5F636866";
+      ctx.beginPath(); ctx.ellipse(x + TS / 2 - 2, y + TS / 2 - 2, TS * 0.18, TS * 0.1, 0, 0, 7); ctx.fill();
+    } else if (b.type === "pit") {
+      ctx.fillStyle = "#2D2A26";
+      ctx.beginPath(); ctx.ellipse(x + TS / 2, y + TS / 2, TS * 0.28, TS * 0.22, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#5F5B54"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x + TS * 0.15, y + TS * 0.35); ctx.lineTo(x + TS * 0.3, y + TS * 0.45);
+      ctx.moveTo(x + TS * 0.85, y + TS * 0.6); ctx.lineTo(x + TS * 0.7, y + TS * 0.52); ctx.stroke();
+    } else if (b.type === "light") {
+      ctx.fillStyle = "#3C4043"; ctx.fillRect(x + TS * 0.42, y + TS * 0.15, TS * 0.16, TS * 0.5);
+      ctx.fillStyle = "#E8453C";
+      ctx.beginPath(); ctx.arc(x + TS * 0.5, y + TS * 0.27, TS * 0.09 + Math.sin(now * 6) * 1, 0, 7); ctx.fill();
+    } else if (b.type === "parade") {
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = ["#E8453C", "#F9AB00", "#34A853", "#1A73E8"][i];
+        const px = x + TS * 0.15 + i * TS * 0.22, py = y + TS * 0.5 + Math.sin(now * 5 + i) * 3;
+        ctx.beginPath(); ctx.arc(px, py, TS * 0.09, 0, 7); ctx.fill();
+      }
+      ctx.font = (TS * 0.3) + "px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("🎉", x + TS / 2, y + TS * 0.32);
+    }
+  }
+  // ambient cars
+  for (const car of cars) if (car.x !== undefined)
+    drawCar(MX + car.x * TS + TS / 2, MY + car.y * TS + TS / 2, car.col);
+  // debris, sparkles & flying coins
+  for (const p of parts) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
+    ctx.fillStyle = p.col;
+    if (p.ptype === "coin") {
+      ctx.beginPath(); ctx.arc(MX + p.x * TS, MY + p.y * TS, 5.5, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#B8860B"; ctx.lineWidth = 1.5; ctx.stroke();
+    } else ctx.fillRect(MX + p.x * TS - 3, MY + p.y * TS - 3, 6, 6);
+  }
+  ctx.globalAlpha = 1;
+  // floating +N / -N money popups
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, f.life * 1.5));
+    ctx.font = "900 " + (TS * 0.42) + "px sans-serif"; ctx.textAlign = "center";
+    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 4;
+    ctx.strokeText(f.text, MX + f.x * TS, MY + f.y * TS);
+    ctx.fillStyle = f.col;
+    ctx.fillText(f.text, MX + f.x * TS, MY + f.y * TS);
+  }
+  ctx.globalAlpha = 1;
+  // rider
+  if (rider) {
+    let x = MX + rider.x * TS + TS / 2, y = MY + rider.y * TS + TS / 2;
+    ctx.fillStyle = "#00000020";
+    ctx.beginPath(); ctx.ellipse(x, y + TS * 0.26, TS * 0.26, TS * 0.08, 0, 0, 7); ctx.fill();
+    if (rider.smashing > 0 && rider.smashKey) {
+      const [sr, sc] = rider.smashKey.split(",").map(Number);
+      const lunge = (Math.sin(now * 12) * 0.5 + 0.5) * TS * 0.28;
+      x += Math.sign(sc - rider.x) * lunge; y += Math.sign(sr - rider.y) * lunge;
+    }
+    const hop = rider.jumpKey ? -Math.sin(rider.t * Math.PI) * TS * 0.5 : 0;
+    const bob = Math.sin(now * 10) * 1.5 + hop;
+    if (mode === "rider" && vehicle > 0) {
+      ctx.font = (TS * 0.62) + "px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(VEHICLES[vehicle].em, x, y + TS * 0.2 + bob);
+    } else {
+      ctx.fillStyle = "#3C4043";
+      ctx.beginPath(); ctx.arc(x - TS * 0.2, y + TS * 0.18, TS * 0.12, 0, 7); ctx.arc(x + TS * 0.2, y + TS * 0.18, TS * 0.12, 0, 7); ctx.fill();
+      ctx.fillStyle = mode === "rider" ? "#1A73E8" : "#E8453C";
+      ctx.fillRect(x - TS * 0.22, y - TS * 0.02 + bob, TS * 0.44, TS * 0.14);
+      ctx.fillStyle = "#FFCF9E"; ctx.beginPath(); ctx.arc(x, y - TS * 0.18 + bob, TS * 0.13, 0, 7); ctx.fill();
+      ctx.fillStyle = "#1A73E8"; ctx.beginPath(); ctx.arc(x, y - TS * 0.2 + bob, TS * 0.13, Math.PI, 0); ctx.fill();
+    }
+    ctx.fillStyle = "#F9AB00"; ctx.fillRect(x + TS * 0.08, y - TS * 0.2 + bob, TS * 0.26, TS * 0.22);
+    ctx.font = (TS * 0.2) + "px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(FOODS[restSel][foodSel].em, x + TS * 0.21, y - TS * 0.02 + bob);
+    if (now < rider.turboUntil || (boosting && mode === "rider")) {
+      ctx.fillStyle = "#F9AB00"; ctx.font = "bold " + TS * 0.35 + "px sans-serif";
+      ctx.fillText("💨", x - TS * 0.45, y + TS * 0.1);
+    }
+    if (rider.smashing > 0) {
+      ctx.font = "bold " + (TS * 0.4) + "px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("💢", x, y - TS * 0.42);
+    }
+    if (now < (rider.sweatUntil || 0) && rider.smashing <= 0) { // wiping his brow after the effort
+      ctx.font = (TS * 0.32) + "px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("💦", x + TS * 0.3, y - TS * 0.35);
+    }
+    if (now < dogUntil) {
+      ctx.font = (TS * 0.45) + "px sans-serif";
+      ctx.fillText(night ? "🦝" : "🐶", x - TS * 0.6, y + TS * 0.15);
+    }
+    if (now < (rider.yawnUntil || 0)) {
+      ctx.font = (TS * 0.35) + "px sans-serif";
+      ctx.fillText("💤", x + TS * 0.35, y - TS * 0.4);
+    }
+    if (rampaging()) {
+      shake = Math.max(shake, 0.1);
+      ctx.font = (TS * 0.5) + "px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("🔥", x - TS * 0.45, y - TS * 0.05);
+      ctx.fillText("🔥", x + TS * 0.45, y - TS * 0.05);
+    }
+    if (level >= 3 && rider.rage > 0 && !rampaging()) {   // fury meter
+      const mw = TS * 0.7, full = rider.rage >= 100;
+      const pulse = full ? 1 + Math.sin(now * 8) * 0.12 : 1;
+      ctx.fillStyle = "#00000022"; ctx.fillRect(x - mw / 2, y + TS * 0.38, mw, 4);
+      ctx.fillStyle = full ? "#E8453C" : "#F9AB00";
+      ctx.fillRect(x - (mw * pulse) / 2, y + TS * 0.38, mw * pulse * (rider.rage / 100), 4);
+      if (full) { ctx.font = (TS * 0.3) + "px sans-serif"; ctx.textAlign = "center"; ctx.fillText("💪", x, y + TS * 0.75); }
+    }
+    if (bubble && now < bubble.until) {
+      ctx.font = "600 13px sans-serif";
+      const tw = ctx.measureText(bubble.text).width + 16;
+      let bx = Math.max(MX + 4, Math.min(x - tw / 2, MX + GW * TS - tw - 4));
+      let by = bubble.toast ? MY + 8 : y - TS * 1.1;
+      ctx.fillStyle = bubble.toast ? "#202124" : "#fff";
+      roundRect(bx, by, tw, 24, 8);
+      ctx.fillStyle = bubble.toast ? "#fff" : "#202124"; ctx.textAlign = "left";
+      ctx.fillText(bubble.text, bx + 8, by + 16);
+    }
+  }
+  // night: darkness with headlight + streetlight pools, moon & stars
+  if (night) {
+    const nc = getNightCv(w, h), g = nc.getContext("2d");
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = "rgba(9,13,42,0.66)";
+    g.fillRect(MX - 2, MY - 2, GW * TS + 4, GH * TS + 4);
+    g.globalCompositeOperation = "destination-out";
+    const hole = (hx, hy, rad) => {
+      const gr = g.createRadialGradient(hx, hy, rad * 0.25, hx, hy, rad);
+      gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr; g.beginPath(); g.arc(hx, hy, rad, 0, 7); g.fill();
+    };
+    if (rider) hole(MX + rider.x * TS + TS / 2, MY + rider.y * TS + TS / 2, TS * 3.4);   // headlights
+    for (const k of lightSet) {
+      const [lr, lc] = k.split(",").map(Number);
+      hole(MX + lc * TS + TS / 2, MY + lr * TS + TS / 2, TS * 2.1);
+    }
+    hole(MX + REST.c * TS + TS / 2, MY + REST.r * TS, TS * 1.4);
+    hole(MX + HOME.c * TS + TS / 2, MY + HOME.r * TS, TS * 1.4);
+    g.globalCompositeOperation = "source-over";
+    ctx.drawImage(nc, 0, 0, w, h);
+    // street lamps glow markers
+    ctx.fillStyle = "#FFE08288";
+    for (const k of lightSet) {
+      const [lr, lc] = k.split(",").map(Number);
+      ctx.beginPath(); ctx.arc(MX + lc * TS + TS / 2, MY + lr * TS + TS * 0.18, 3, 0, 7); ctx.fill();
+    }
+    // moon + stars
+    ctx.fillStyle = "#FFF9D6";
+    ctx.beginPath(); ctx.arc(MX + GW * TS - TS * 0.8, MY + TS * 0.7, TS * 0.32, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(9,13,42,0.9)";
+    ctx.beginPath(); ctx.arc(MX + GW * TS - TS * 0.68, MY + TS * 0.6, TS * 0.26, 0, 7); ctx.fill();
+    ctx.fillStyle = "#FFFFFFAA";
+    for (let i = 0; i < 14; i++) {
+      const sx = MX + ((i * 137.5) % (GW * TS)), sy = MY + ((i * 89.3) % (TS * 2.4));
+      const tw = (Math.sin(now * 2 + i) + 1) / 2;
+      ctx.globalAlpha = 0.3 + tw * 0.5;
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // rain
+  if (now < rainUntil) {
+    ctx.fillStyle = "#1A73E810"; ctx.fillRect(MX, MY, GW * TS, GH * TS);
+    ctx.strokeStyle = "#1A73E866"; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 60; i++) {
+      const rx = MX + ((i * 61.7 + now * 260) % (GW * TS));
+      const ry = MY + ((i * 37.3 + now * 420) % (GH * TS));
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 4, ry + 10); ctx.stroke();
+    }
+  }
+  ctx.restore();
+  // HUD (scales down on small screens)
+  const u = Math.max(0.72, Math.min(1, w / 520));
+  ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, w, 58);
+  ctx.fillStyle = "#0002"; ctx.fillRect(0, 58, w, 1);
+  ctx.textAlign = "left"; ctx.fillStyle = "#F9AB00";
+  ctx.font = "800 " + Math.round(16 * u * (1 + hudPulse * 0.7)) + "px sans-serif";
+  ctx.fillText((mode === "sab" ? "😈 " : "🛵 ") + Math.floor(myCoins()) + " coins", 12, 24);
+  ctx.font = "700 " + Math.round(12 * u) + "px sans-serif"; ctx.fillStyle = "#5F6368";
+  ctx.fillText(mode === "sab" ? "🛵 rider: " + Math.floor(wallets.rider) : "😈 saboteur: " + Math.floor(wallets.player), 12, 46);
+  ctx.textAlign = "center"; ctx.fillStyle = timer < 6 ? "#E8453C" : "#202124";
+  ctx.font = "800 " + Math.round(22 * u) + "px sans-serif";
+  const mm = Math.floor(Math.max(0, timer) / 60), ss = Math.ceil(Math.max(0, timer) % 60) % 60;
+  ctx.fillText("⏱ " + mm + ":" + String(ss).padStart(2, "0"), w / 2, 30);
+  ctx.font = "600 " + Math.round(11 * u) + "px sans-serif"; ctx.fillStyle = "#5F6368";
+  ctx.fillText((mode === "sab" ? "make it LATE!" : "deliver ON TIME!") + (night ? "  ·  🌙 2× tips" : ""), w / 2, 48);
+  ctx.textAlign = "right"; ctx.fillStyle = "#5F6368"; ctx.font = "700 " + Math.round(14 * u) + "px sans-serif";
+  ctx.fillText("Lv " + level + " · Best " + best, w - (48 * u + 14), 24); // clear of the mute button
+  // progress bar
+  if (rider && state === "play") {
+    let prog = 0;
+    if (mode === "sab" && rider.path.length > 1) prog = (rider.seg + rider.t) / (rider.path.length - 1);
+    else {
+      const total = Math.abs(HOME.r - REST.r) + Math.abs(HOME.c - REST.c);
+      const left = Math.abs(HOME.r - rider.y) + Math.abs(HOME.c - rider.x);
+      prog = Math.max(0, Math.min(1, 1 - left / total));
+    }
+    ctx.fillStyle = "#E8EAED"; ctx.fillRect(0, 54, w, 4);
+    ctx.fillStyle = prog > 0.8 ? "#E8453C" : "#1A73E8"; ctx.fillRect(0, 54, w * prog, 4);
+  }
+  // countdown overlay: rider waits, clock waits
+  if (state === "countdown") {
+    ctx.fillStyle = night ? "#0A0E2ACC" : "#FFFFFFB8"; ctx.fillRect(MX, MY, GW * TS, GH * TS);
+    const n = Math.ceil(cd - 0.5);
+    ctx.textAlign = "center"; ctx.fillStyle = n > 0 ? (night ? "#8AB4F8" : "#1A73E8") : "#34A853";
+    ctx.font = "900 " + (TS * 2.4) + "px sans-serif";
+    const scale = 1 + (cd % 1) * 0.15;
+    ctx.save(); ctx.translate(MX + GW * TS / 2, MY + GH * TS / 2); ctx.scale(scale, scale);
+    ctx.fillText(n > 0 ? String(n) : "GO!", 0, TS * 0.8);
+    ctx.restore();
+    ctx.font = "700 16px sans-serif"; ctx.fillStyle = night ? "#C5CAE9" : "#5F6368";
+    ctx.fillText((mode === "sab" ? "Get ready to sabotage…" : "Get ready to ride…") + (night ? " 🌙" : ""), MX + GW * TS / 2, MY + GH * TS / 2 + TS * 2.2);
+  }
+}
+let nightCv = null;
+function getNightCv(w, h) {
+  if (!nightCv) nightCv = document.createElement("canvas");
+  if (nightCv.width !== w || nightCv.height !== h) { nightCv.width = w; nightCv.height = h; }
+  return nightCv;
+}
+function drawCar(x, y, col) {
+  ctx.fillStyle = "#00000018";
+  ctx.beginPath(); ctx.ellipse(x, y + TS * 0.13, TS * 0.2, TS * 0.07, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = col; roundRect(x - TS * 0.19, y - TS * 0.11, TS * 0.38, TS * 0.22, 4);
+  ctx.fillStyle = "#20212455"; ctx.fillRect(x - TS * 0.08, y - TS * 0.08, TS * 0.16, TS * 0.16);
+}
+function drawPin(p, color, emoji) {
+  const x = MX + p.c * TS + TS / 2, y = MY + p.r * TS + TS / 2;
+  ctx.fillStyle = "#00000020";
+  ctx.beginPath(); ctx.ellipse(x, y + TS * 0.22, TS * 0.16, TS * 0.06, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y - TS * 0.28, TS * 0.3, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(x, y + TS * 0.18);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(x, y - TS * 0.28, TS * 0.2, 0, 7); ctx.fill();
+  ctx.font = (TS * 0.3) + "px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(emoji, x, y - TS * 0.18);
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); ctx.fill();
+}
+
+/* ---------- Main loop ---------- */
+let last = 0, firstFrameSent = false, lastTickSec = -1;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts;
+  now += dt;
+  if (state === "countdown" && !frozen()) {
+    cd -= dt;
+    const n = Math.ceil(cd - 0.5);
+    if (n !== lastTickSec && n > 0) { lastTickSec = n; Sound.tick(); }
+    if (cd <= 0) { state = "play"; Sound.coin(); }
+  }
+  if (state === "play" && !frozen()) {
+    timer -= dt;
+    // rookie allowance: a small income trickle early on, gone by level 10
+    const trickle = Math.max(0, 3 - (level - 1) * 0.33);
+    if (mode === "sab" && trickle > 0 && wallets.player < 80) wallets.player += trickle * dt;
+    if (night && now > nextYawnAt && rider) {
+      nextYawnAt = now + 13 + Math.random() * 6;
+      rider.yawnUntil = now + 1.3;
+      bubble = { text: "😴 *yaaawn*… so sleepy", until: now + 1.8 };
+    }
+    for (const [k, b] of blocks) if (b.until && now > b.until) blocks.delete(k);
+    updateTraffic(dt);
+    if (mode === "sab") updateRiderAI(dt);
+    else { updateAISaboteur(); updateRiderPlayer(dt); }
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= dt;
+      if (p.ptype === "coin" && p.life < 1.2) {         // after the pop, coins fly home to the counter
+        const tx = (14 - MX) / TS + 0.5, ty = (20 - MY) / TS;
+        p.vx += (tx - p.x) * 26 * dt; p.vy += (ty - p.y) * 26 * dt;
+        p.vx *= 0.92; p.vy *= 0.92;
+        if (Math.hypot(tx - p.x, ty - p.y) < 0.5) { p.life = 0; hudPulse = 0.35; }
+      } else if (p.ptype !== "coin") p.vy += 9 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.life <= 0) parts.splice(i, 1);
+    }
+    for (let i = floaters.length - 1; i >= 0; i--) {
+      const f = floaters[i];
+      f.life -= dt; f.y -= dt * 0.9;
+      if (f.life <= 0) floaters.splice(i, 1);
+    }
+    if (timer < 6 && Math.floor(timer) !== lastTickSec) { lastTickSec = Math.floor(timer); Sound.tick(); }
+    if (riderArrived()) {
+      if (timer > 0) endRound(mode === "rider");        // on time: rider side wins
+      else endRound(mode === "sab");
+    } else if (timer <= 0) endRound(mode === "sab");    // late: customer side wins
+    if (saveDirty && now - lastSaveAt > 4) doSave();
+  }
+  shake = Math.max(0, shake - dt * 1.1);
+  hudPulse = Math.max(0, hudPulse - dt);
+  if (!frozen()) Sound.musicTick();
+  updateToolbar();
+  show("pauseScreen", paused && state === "play" && !reviveOffered);
+  draw();
+  if (!firstFrameSent) { firstFrameSent = true; Platform.ready(); }
+}
+
+/* ---------- UI wiring ---------- */
+function show(id, on) { document.getElementById(id).classList.toggle("hidden", !on); }
+function el(id) { return document.getElementById(id); }
+let toolBtns = {};
+function buildToolbar() {
+  const tb = el("toolbar"); tb.innerHTML = ""; toolBtns = {};
+  if (mode === "rider") {
+    const b = document.createElement("button");
+    b.className = "tool"; b.id = "tool_boost"; b.style.width = "150px";
+    b.innerHTML = '<span class="ic">🔥</span>HOLD TO BOOST<span class="cost">drains ⚡</span>';
+    b.addEventListener("pointerdown", () => { boosting = true; Sound.unlock(); });
+    b.addEventListener("pointerup", () => { boosting = false; });
+    b.addEventListener("pointercancel", () => { boosting = false; });
+    tb.appendChild(b); toolBtns.boost = b;
+    if (level >= 3) {
+      const rb = document.createElement("button");
+      rb.className = "tool"; rb.id = "tool_rampage"; rb.style.width = "130px";
+      rb.innerHTML = '<span class="ic">💪</span>RAMPAGE<span class="cost">smash 3 to charge</span>';
+      rb.addEventListener("click", () => { Sound.unlock(); if (rampageReady() && !rampaging() && state === "play") startRampage(); });
+      tb.appendChild(rb); toolBtns.rampage = rb;
+    }
+    addAdBtn(tb);
+    return;
+  }
+  for (const t of TOOLS) {
+    if (t.unlock > level) continue;
+    const b = document.createElement("button");
+    b.className = "tool"; b.id = "tool_" + t.key;
+    b.innerHTML = `<span class="ic">${t.em}</span>${t.name}<span class="cost">${t.cost}💰</span>`;
+    b.addEventListener("click", () => {
+      Sound.unlock();
+      if (t.tile) tool = t.key; else tryInstant(t.key);
+    });
+    tb.appendChild(b); toolBtns[t.key] = b;
+  }
+  addAdBtn(tb);
+}
+let adReadyAt = 0;
+function addAdBtn(tb) {
+  const b = document.createElement("button");
+  b.className = "tool"; b.id = "tool_ad";
+  b.innerHTML = '<span class="ic">📺</span>Free coins<span class="cost">+50</span>';
+  b.addEventListener("click", () => {
+    if (now < adReadyAt) return Sound.deny();
+    adReadyAt = now + 45;
+    Platform.showRewarded(() => { addCoins(50); Sound.coin(); });
+  });
+  tb.appendChild(b); toolBtns.ad = b;
+}
+function updateToolbar() {
+  for (const [k, b] of Object.entries(toolBtns)) {
+    if (k === "boost") { b.disabled = myCoins() <= 0; continue; }
+    if (k === "rampage") { b.disabled = !(state === "play" && rampageReady() && !rampaging()); b.classList.toggle("sel", rampageReady()); continue; }
+    if (k === "ad") { b.disabled = state !== "play" || now < adReadyAt; continue; }
+    const t = toolDef(k);
+    b.classList.toggle("sel", tool === k && t.tile);
+    b.disabled = state !== "play" || myCoins() < t.cost ||
+      (k === "rain" && now < rainUntil) || (k === "dog" && now < dogUntil);
+  }
+}
+
+cv.addEventListener("pointerdown", e => {
+  Sound.unlock();
+  if (state !== "play") return;
+  if (mode === "rider") { swipeStart = { x: e.clientX, y: e.clientY }; return; }
+  const rect = cv.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left - MX) / TS);
+  const r = Math.floor((e.clientY - rect.top - MY) / TS);
+  tryPlace(r, c);
+});
+let swipeStart = null;
+cv.addEventListener("pointerup", e => {
+  if (mode !== "rider" || !swipeStart) return;
+  const dx = e.clientX - swipeStart.x, dy = e.clientY - swipeStart.y;
+  swipeStart = null;
+  if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+  const d = Math.abs(dx) > Math.abs(dy) ? { dr: 0, dc: Math.sign(dx) } : { dr: Math.sign(dy), dc: 0 };
+  if (rider) rider.queued = d;
+});
+cv.addEventListener("pointercancel", () => { swipeStart = null; boosting = false; });
+
+document.addEventListener("keydown", e => {
+  if (["Shift", "Control", "Alt", "Meta", "Tab", "Escape"].includes(e.key)) return;
+  if (state !== "play") return;
+  if (mode === "rider") {
+    const dirs = { ArrowUp: { dr: -1, dc: 0 }, ArrowDown: { dr: 1, dc: 0 }, ArrowLeft: { dr: 0, dc: -1 }, ArrowRight: { dr: 0, dc: 1 },
+                   w: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 }, a: { dr: 0, dc: -1 }, d: { dr: 0, dc: 1 } };
+    const d = dirs[e.key] || dirs[e.key.toLowerCase()];
+    if (d && rider) rider.queued = d;
+    if (e.key === " ") boosting = true;
+    return;
+  }
+  const idx = parseInt(e.key, 10);
+  if (idx >= 1 && idx <= TOOLS.length) {
+    const t = TOOLS[idx - 1];
+    if (t.unlock <= level) { if (t.tile) tool = t.key; else tryInstant(t.key); }
+  }
+  if (e.key.toLowerCase() === "r") tryInstant("rain");
+});
+document.addEventListener("keyup", e => { if (e.key === " ") boosting = false; });
+
+/* Side + order screens */
+function renderTimeCards() {
+  el("dayCard").className = "card" + (night ? "" : " sel");
+  el("nightCard").className = "card" + (night ? " sel" : "");
+}
+el("dayCard").addEventListener("click", () => { night = false; Sound.unlock(); renderTimeCards(); });
+el("nightCard").addEventListener("click", () => { night = true; Sound.unlock(); renderTimeCards(); });
+el("sideSab").addEventListener("click", () => { mode = "sab"; Sound.unlock(); toSideOrder(); });
+el("sideRider").addEventListener("click", () => { mode = "rider"; Sound.unlock(); toSideOrder(); });
+function toSideOrder() {
+  show("sideScreen", false); show("orderScreen", true); state = "order";
+  el("vehWrap").classList.toggle("hidden", mode !== "rider");
+  buildCards(); buildVehCards(); renderTimeCards();
+}
+function buildVehCards() {
+  const vc = el("vehCards"); vc.innerHTML = "";
+  if (mode !== "rider") return;
+  if (VEHICLES[vehicle].cost > wallets.rider) vehicle = 0;
+  VEHICLES.forEach((v, i) => {
+    const afford = wallets.rider >= v.cost;
+    const d = document.createElement("div");
+    d.className = "card" + (i === vehicle ? " sel" : "");
+    d.style.opacity = afford ? 1 : 0.45;
+    d.innerHTML = `<div class="em">${v.em}</div><div class="nm">${v.name}</div><div class="sub">${v.cost ? v.cost + " 🛵 coins · " : "free · "}${Math.round((v.spd - 1) * 100)}% faster</div>`;
+    d.onclick = () => { if (!afford) return Sound.deny(); vehicle = i; Sound.unlock(); buildVehCards(); };
+    vc.appendChild(d);
+  });
+}
+function buildCards() {
+  const rc = el("restCards"); rc.innerHTML = "";
+  RESTAURANTS.forEach((r, i) => {
+    const d = document.createElement("div");
+    d.className = "card" + (i === restSel ? " sel" : "");
+    d.innerHTML = `<div class="em">${r.em}</div><div class="nm">${r.name}</div><div class="sub">${r.sub}</div>`;
+    d.onclick = () => { restSel = i; foodSel = 0; Sound.unlock(); buildCards(); };
+    rc.appendChild(d);
+  });
+  const fc = el("foodCards"); fc.innerHTML = "";
+  FOODS[restSel].forEach((f, i) => {
+    const d = document.createElement("div");
+    d.className = "card" + (i === foodSel ? " sel" : "");
+    const eta = 2 + ((restSel * 3 + i * 7) % 4);
+    d.innerHTML = `<div class="em">${f.em}</div><div class="nm">${f.name}</div><div class="sub">~${eta} min delivery</div>`;
+    d.onclick = () => { foodSel = i; Sound.unlock(); buildCards(); };
+    fc.appendChild(d);
+  });
+}
+el("orderBtn").addEventListener("click", () => { Sound.unlock(); startLevel(); });
+el("nextBtn").addEventListener("click", () => { Sound.unlock(); startLevel(); });
+el("retryBtn").addEventListener("click", () => { Sound.unlock(); restart(); });
+
+/* read-only state peek for tests/debugging */
+window.__snack = () => ({ state, mode, level, coins: myCoins(), cd, vehicle, night, dirt: [...dirtSet], rage: rider && rider.rage, timer, promised, wallets: { ...wallets },
+  blocks: [...blocks.keys()], seg: rider && rider.seg, pathLen: rider && rider.path && rider.path.length,
+  path: rider && rider.path, at: rider && rider.at, smashing: rider && rider.smashing });
+
+/* ---------- Boot ---------- */
+(async function boot() {
+  genMap(1);
+  resize();
+  buildToolbar();
+  await Platform.init();
+  Platform.onPause(p => { paused = !!p; });
+  Platform.onAdActivity(active => { adOpen = active; Sound.setMuted(active || userMuted || platformMuted); });
+  Platform.onAudio(enabled => { platformMuted = !enabled; applyMute(); });
+  el("muteBtn").addEventListener("click", () => { Sound.unlock(); userMuted = !userMuted; applyMute(); saveDirty = true; });
+  const save = await Platform.load();
+  if (save) {
+    best = save.best || 1; stats.wins = save.wins || 0; stats.sabotages = save.sabotages || 0;
+    wallets.player = save.playerCoins || 0; wallets.rider = save.riderCoins || 0;
+    userMuted = !!save.muted;
+  }
+  applyMute();
+  el("walletsSide").textContent = walletLine();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
