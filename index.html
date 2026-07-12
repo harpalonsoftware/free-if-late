@@ -39,9 +39,14 @@
   .card .sub { font-size:10px; color:#5F6368; margin-top:3px; }
   .wallets { font-size:14px; font-weight:700; color:#5F6368; margin-top:10px; }
   .hidden { display:none !important; }
-  #muteBtn { position:absolute; top:8px; right:10px; z-index:6; width:42px; height:42px; border-radius:50%;
+  #muteBtn, #helpBtn { position:absolute; top:8px; right:10px; z-index:6; width:42px; height:42px; border-radius:50%;
     border:1px solid #DADCE0; background:#fff; font-size:19px; cursor:pointer; box-shadow:0 1px 4px #0003;
     display:flex; align-items:center; justify-content:center; }
+  #helpBtn { right:58px; font-size:17px; }
+  .howto { text-align:left; max-width:420px; background:#fff; border:1px solid #DADCE0; border-radius:14px;
+    padding:14px 18px; margin:10px 0; box-shadow:0 1px 4px #0002; }
+  .howto h3 { margin:0 0 6px; font-size:16px; }
+  .howto p { margin:4px 0; font-size:14px; color:#3C4043; }
   @media (max-width: 480px) {
     .screen h1 { font-size:24px; } .screen h2 { font-size:16px; } .screen p { font-size:13px; }
     .cards { gap:6px; }
@@ -58,6 +63,7 @@
 <div id="wrap">
   <canvas id="cv"></canvas>
   <button id="muteBtn" aria-label="Mute or unmute game sound">🔊</button>
+  <button id="helpBtn" aria-label="How to play">❓</button>
   <div id="toolbar"></div>
 
   <div class="screen" id="sideScreen">
@@ -105,6 +111,30 @@
   </div>
 
   <div class="screen hidden" id="pauseScreen"><h1>⏸ PAUSED</h1></div>
+
+  <div class="screen hidden" id="helpScreen">
+    <h1>❓ How to play</h1>
+    <div class="howto">
+      <h3>😈 Hungry Customer — make it LATE</h3>
+      <p>• Late order = FREE food. Run out the clock!</p>
+      <p>• <b>Tap any road tile</b> to place the selected trap (🚧 roadblock, 🛢️ oil…).</p>
+      <p>• Tap a trap again to remove it (partial refund).</p>
+      <p>• Buttons like 🌧️ rain and 🐶 dog act instantly. New traps unlock each level.</p>
+      <p>• He fights back: smashing walls, shortcuts, and full 💪 RAMPAGE when furious.</p>
+    </div>
+    <div class="howto">
+      <h3>🛵 Delivery Hero — deliver ON TIME</h3>
+      <p>• <b>Swipe</b> (or arrow/WASD keys) to steer at intersections.</p>
+      <p>• Hold 🔥 BOOST for speed — it drains coins.</p>
+      <p>• Muddy shortcuts are faster but have pop-up nails. Time them — a nail = 💥 flat tire!</p>
+    </div>
+    <div class="howto">
+      <h3>💰 Coins</h3>
+      <p>• Whoever wins the round banks coins. Spend them on traps, smashing, boosting and better vehicles.</p>
+      <p>• Broke? Watch a 📺 for +50.</p>
+    </div>
+    <button class="bigbtn" id="helpClose">Got it!</button>
+  </div>
 
   <div class="screen hidden" id="reviveScreen">
     <h1 id="reviveTitle">🚫 TRAPPED!</h1>
@@ -384,7 +414,7 @@ let lastAdAt = -1e9, saveDirty = false, lastSaveAt = 0;
 let stats = { sabotages: 0, wins: 0 };
 let traffic = new Set(), trafficUntil = 0, nextTrafficAt = 0, cars = [], jamCars = [], parts = [];
 let aiNextAt = 0, boosting = false, riderSpent = 0;
-let userMuted = false, platformMuted = false;
+let userMuted = false, platformMuted = false, newPlayer = true, hintStage = 0;
 function applyMute() {
   Sound.setMuted(userMuted || platformMuted);
   el("muteBtn").textContent = (userMuted || platformMuted) ? "🔇" : "🔊";
@@ -458,7 +488,7 @@ function startLevel() {
   const travel = (rider.path.length - 1) / spd;
   promised = Math.ceil(travel * (mode === "rider" ? 1.55 : timerFactor(level)));
   timer = promised;
-  state = "countdown"; cd = 3.5; reviveOffered = false; gameOver = false; riderSpent = 0;
+  state = "countdown"; cd = 3.5; reviveOffered = false; gameOver = false; riderSpent = 0; hintStage = 0;
   const td = toolDef(tool);
   if (!td || !td.tile || td.unlock > level) tool = "block";  // never leave a locked tool selected
   buildToolbar();
@@ -1281,6 +1311,17 @@ function frame(ts) {
     // rookie allowance: a small income trickle early on, gone by level 10
     const trickle = Math.max(0, 3 - (level - 1) * 0.33);
     if (mode === "sab" && trickle > 0 && wallets.player < 80) wallets.player += trickle * dt;
+    // first-round hints: one nudge at GO, one if they still haven't acted
+    if (newPlayer && hintStage < 2) {
+      const elapsed = promised - timer;
+      if (hintStage === 0 && elapsed > 0.3) {
+        hintStage = 1;
+        bubble = { text: mode === "sab" ? "Tap any road tile to drop a 🚧 — make him LATE!" : "Swipe or use arrow keys to steer! Deliver before ⏱", until: now + 4.5, toast: true };
+      } else if (hintStage === 1 && elapsed > 6 && stats.sabotages === 0 && mode === "sab") {
+        hintStage = 2;
+        bubble = { text: "Traps cost 💰 — try the 🛢️ oil slick too!", until: now + 4, toast: true };
+      }
+    }
     if (night && now > nextYawnAt && rider) {
       nextYawnAt = now + 13 + Math.random() * 6;
       rider.yawnUntil = now + 1.3;
@@ -1490,11 +1531,14 @@ window.__snack = () => ({ state, mode, level, coins: myCoins(), cd, vehicle, nig
   Platform.onAdActivity(active => { adOpen = active; Sound.setMuted(active || userMuted || platformMuted); });
   Platform.onAudio(enabled => { platformMuted = !enabled; applyMute(); });
   el("muteBtn").addEventListener("click", () => { Sound.unlock(); userMuted = !userMuted; applyMute(); saveDirty = true; });
+  el("helpBtn").addEventListener("click", () => { Sound.unlock(); paused = true; show("helpScreen", true); });
+  el("helpClose").addEventListener("click", () => { show("helpScreen", false); paused = false; });
   const save = await Platform.load();
   if (save) {
     best = save.best || 1; stats.wins = save.wins || 0; stats.sabotages = save.sabotages || 0;
     wallets.player = save.playerCoins || 0; wallets.rider = save.riderCoins || 0;
     userMuted = !!save.muted;
+    newPlayer = !(save.wins > 0 || save.sabotages > 2);   // hints only for genuine first-timers
   }
   applyMute();
   el("walletsSide").textContent = walletLine();
